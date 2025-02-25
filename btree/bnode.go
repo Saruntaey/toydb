@@ -31,8 +31,8 @@ func assert(b bool, msg string) {
 }
 
 func init() {
-	leafNodeMax := 4 + 1*8 + 1*2 + BTREE_MAX_KEY_SIZE + BTREE_MAX_VAL_SIZE
-	internalNodeMax := 4 + 2*8 + 2*2 + 2*BTREE_MAX_KEY_SIZE
+	leafNodeMax := 4 + 1*8 + 1*2 + (4 + BTREE_MAX_KEY_SIZE + BTREE_MAX_VAL_SIZE)
+	internalNodeMax := 4 + 2*8 + 2*2 + 2*(4+BTREE_MAX_KEY_SIZE)
 	assert(leafNodeMax <= BTREE_PAGE_SIZE, "data cannot fit in leaf node")
 	assert(internalNodeMax <= BTREE_PAGE_SIZE, "internal node should hold at least 2 keys")
 }
@@ -148,16 +148,6 @@ func lookup(n BNode, key []byte) (uint16, bool) {
 	return i, false
 }
 
-func leafUpsert(src BNode, key, val []byte) BNode {
-	dst := make(BNode, 2*BTREE_PAGE_SIZE)
-	if idx, ok := lookup(src, key); ok {
-		leafUpdate(dst, src, idx, key, val)
-	} else {
-		leafInsert(dst, src, idx, key, val)
-	}
-	return dst
-}
-
 func nodeSplit2(left, right, src BNode) {
 	assert(src.nkeys() >= 2, "nodeSplit2: split node with one key")
 	leftSize := func(idx uint16) uint16 {
@@ -201,6 +191,18 @@ func nodeSplit3(src BNode) []BNode {
 	return []BNode{left, rightLeft, rightRight}
 }
 
+func leafDelete(dst, src BNode, idx uint16) {
+	dst.setHeader(BNODE_LEAF, src.nkeys()-1)
+	appendKvRange(dst, src, 0, 0, idx)
+	appendKvRange(dst, src, idx, idx+1, src.nkeys()-idx-1)
+}
+
+func nodeMerge(dst, left, right BNode) {
+	dst.setHeader(left.nbytes(), left.nkeys()+right.nkeys())
+	appendKvRange(dst, left, 0, 0, left.nkeys())
+	appendKvRange(dst, right, left.nkeys(), 0, right.nkeys())
+}
+
 func checkIdx(idx, length uint16) {
-	assert(idx < length, fmt.Sprintf("index out of bound i=%d, len=%d", idx, length))
+	assert(0 <= idx && idx < length, fmt.Sprintf("index out of bound i=%d, len=%d", idx, length))
 }
