@@ -131,21 +131,21 @@ func leafUpdate(dst, src BNode, idx uint16, key, val []byte) {
 }
 
 func lookup(n BNode, key []byte) (uint16, bool) {
-	i := uint16(0)
-	j := n.nkeys() - 1
-	var mid uint16
+	i := 0
+	j := int(n.nkeys() - 1)
+	var mid int
 
 	for i <= j {
 		mid = i + (j-i)/2
-		if diff := bytes.Compare(n.getKey(mid), key); diff == 0 {
-			return mid, true
+		if diff := bytes.Compare(n.getKey(uint16(mid)), key); diff == 0 {
+			return uint16(mid), true
 		} else if diff < 0 {
 			i = mid + 1
 		} else {
 			j = mid - 1
 		}
 	}
-	return i, false
+	return uint16(i), false
 }
 
 func nodeSplit2(left, right, src BNode) {
@@ -176,13 +176,13 @@ func nodeSplit2(left, right, src BNode) {
 
 func nodeSplit3(src BNode) []BNode {
 	if src.nbytes() <= BTREE_PAGE_SIZE {
-		return []BNode{src}
+		return []BNode{src[:BTREE_PAGE_SIZE]}
 	}
 	left := make(BNode, BTREE_PAGE_SIZE)
 	right := make(BNode, 2*BTREE_PAGE_SIZE)
 	nodeSplit2(left, right, src)
 	if right.nbytes() <= BTREE_PAGE_SIZE {
-		return []BNode{left, right}
+		return []BNode{left, right[:BTREE_PAGE_SIZE]}
 	}
 	rightLeft := make(BNode, BTREE_PAGE_SIZE)
 	rightRight := make(BNode, BTREE_PAGE_SIZE)
@@ -198,7 +198,7 @@ func leafDelete(dst, src BNode, idx uint16) {
 }
 
 func nodeMerge(dst, left, right BNode) {
-	dst.setHeader(left.nbytes(), left.nkeys()+right.nkeys())
+	dst.setHeader(left.btype(), left.nkeys()+right.nkeys())
 	appendKvRange(dst, left, 0, 0, left.nkeys())
 	appendKvRange(dst, right, left.nkeys(), 0, right.nkeys())
 }

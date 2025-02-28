@@ -25,7 +25,7 @@ func (t *BTree) Insert(key, val []byte) {
 	nodes := nodeSplit3(node)
 	nsplit := uint16(len(nodes))
 	if nsplit == 1 {
-		t.root = t.new(node)
+		t.root = t.new(nodes[0])
 		return
 	}
 	root := BNode(make([]byte, BTREE_PAGE_SIZE))
@@ -74,6 +74,9 @@ func treeInsert(tree *BTree, node BNode, key, val []byte) BNode {
 			leafInsert(clone, node, idx, key, val)
 		}
 	case BNODE_NODE:
+		if !ok && idx > 0 {
+			idx--
+		}
 		kid := treeInsert(tree, tree.get(node.getPtr(idx)), key, val)
 		kids := nodeSplit3(kid)
 		nodeReplaceKidN(tree, clone, node, idx, kids)
@@ -90,7 +93,7 @@ func nodeReplaceKidN(tree *BTree, dst, src BNode, idx uint16, kids []BNode) {
 	for i, n := range kids {
 		appendKv(dst, idx+uint16(i), tree.new(n), n.getKey(0), nil)
 	}
-	appendKvRange(dst, src, idx+inc, idx, src.nkeys()-idx-1)
+	appendKvRange(dst, src, idx+inc, idx+1, src.nkeys()-idx-1)
 	tree.del(src.getPtr(idx))
 }
 
@@ -135,6 +138,9 @@ func treeDelete(tree *BTree, node BNode, key []byte) (BNode, bool) {
 		leafDelete(updated, node, idx)
 		return updated, true
 	case BNODE_NODE:
+		if !ok && idx > 0 {
+			idx--
+		}
 		kid, ok := treeDelete(tree, tree.get(node.getPtr(idx)), key)
 		if !ok {
 			return updated, false
@@ -145,11 +151,11 @@ func treeDelete(tree *BTree, node BNode, key []byte) (BNode, bool) {
 		case dir == -1:
 			merged := BNode(make([]byte, BTREE_PAGE_SIZE))
 			nodeMerge(merged, sibling, updated)
-			nodeReplace2Kid(tree, updated, node, idx-1, kid)
+			nodeReplace2Kid(tree, updated, node, idx-1, merged)
 		case dir == 1:
 			merged := BNode(make([]byte, BTREE_PAGE_SIZE))
 			nodeMerge(merged, updated, sibling)
-			nodeReplace2Kid(tree, updated, node, idx, kid)
+			nodeReplace2Kid(tree, updated, node, idx, merged)
 		case dir == 0 && kid.nkeys() == 0: // kid is empty but have no sibling to merge
 			assert(node.nkeys() == 1 && idx == 0, "node should have one key")
 			updated.setHeader(BNODE_NODE, 0)
